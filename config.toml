@@ -1,0 +1,11 @@
+[device]
+vid = 0x87ad
+pid = 0x70db
+
+[resolution]
+width = 320
+height = 320
+
+[picture]
+type = "image"
+file = "./cat.jpg"

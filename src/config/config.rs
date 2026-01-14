@@ -18,8 +18,8 @@ pub struct Device {
 
 #[derive(Debug, Deserialize)]
 pub struct Resolution {
-    pub width: u32,
-    pub height: u32,
+    pub width: u16,
+    pub height: u16,
 }
 
 #[derive(Debug, Deserialize)]

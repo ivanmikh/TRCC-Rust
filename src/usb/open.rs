@@ -52,7 +52,7 @@ pub fn open_device<T: UsbContext>(
     None
 }
 
-pub fn read_device<T: UsbContext>(
+pub fn read_device_info<T: UsbContext>(
     device_desc: &DeviceDescriptor,
     handle: &mut DeviceHandle<T>,
 ) -> Result<()> {

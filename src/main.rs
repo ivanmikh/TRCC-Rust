@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use anyhow::Result;
 use clap::Parser;
 use hexdump::hexdump;
@@ -8,15 +6,17 @@ use std::time::Duration;
 use std::io::{self, Write};
 
 mod usb;
-use crate::usb::open::{open_device, read_device, find_bulk_endpoints};
-use crate::usb::probe::probe;
-use crate::usb::send::send_bulk_out;
+use crate::usb::open::{open_device, read_device_info, find_bulk_endpoints};
+use crate::usb::bulk::send_bulk_out;
 
 mod framebuffer;
 use crate::framebuffer::compose::{picture_frame, solid_color_frame};
 
 mod config;
 use crate::config::config::load_config;
+
+mod protocol;
+use crate::protocol::probe::probe;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
     };
 
     println!("# Device opened successfully. Desc info:");
-    read_device(&device_desc, &mut handle)?;
+    read_device_info(&device_desc, &mut handle)?;
 
     println!("# Looking for bulk endpoints.");
     let bulk_eps = match find_bulk_endpoints(&mut device, &device_desc) {
@@ -61,13 +61,13 @@ fn main() -> Result<()> {
     println!("# Let's send some frames");
     let frame = match config.picture {
         config::config::Picture::SolidColor { color } => {
-            solid_color_frame(color)
+            solid_color_frame(config.resolution.width, config.resolution.height, color)
         },
         config::config::Picture::Image { file } => {
-            picture_frame(&file)
+            picture_frame(config.resolution.width, config.resolution.height, &file)
         },
         config::config::Picture::Video { file, fps } => {
-            solid_color_frame(0)
+            !todo!()
         },
     };
 

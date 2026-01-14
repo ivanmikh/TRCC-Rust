@@ -22,3 +22,18 @@ pub fn send_bulk_out<T: UsbContext>(
 
     Ok(())
 }
+
+pub fn read_bulk_in<T: UsbContext>(
+    handle: &DeviceHandle<T>,
+    ep_in: u8,
+) -> Result<[u8; 64]> {
+    let timeout = Duration::from_secs(1);
+
+    let mut resp = [0u8; 64];
+
+    handle
+        .read_bulk(ep_in, &mut resp, timeout)
+        .context("read_bulk probe response failed")?;
+
+    Ok(resp)
+}

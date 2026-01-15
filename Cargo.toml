@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
+bytemuck = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
 hexdump = "0.1"
 rusb = "0.9"

@@ -1,0 +1,11 @@
+[Unit]
+Description=ThermalRight Cooler Controller LCD Display
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/trcc -c %h/.config/trcc/config.toml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

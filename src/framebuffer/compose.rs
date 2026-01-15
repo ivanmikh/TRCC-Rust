@@ -18,14 +18,14 @@ fn solid_color_rgb565(
 }
 
 pub fn solid_color_frame(
-    color: u16,
     width: u16,
     height: u16,
+    color: u16,
 ) -> Vec<u8> {
-    let frame_size = (width * height) as usize;
-
-    let pixels = solid_color_rgb565(color, frame_size);
     let bytes_per_pixel: u16 = 2;
+    let frame_size_bytes = (width as usize) * (height as usize) * (bytes_per_pixel as usize);
+
+    let pixels = solid_color_rgb565(color, frame_size_bytes);
 
     compose_frame_pkt(width, height, bytes_per_pixel, pixels)
 }

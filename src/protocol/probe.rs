@@ -1,12 +1,8 @@
-use anyhow::{
-    Context, Result
-};
+use anyhow::Result;
 
 use rusb::{
     DeviceHandle, UsbContext
 };
-
-use hexdump::hexdump;
 
 use crate::protocol::protocol::compose_probe_request;
 use crate::usb::bulk::{send_bulk_out, read_bulk_in};

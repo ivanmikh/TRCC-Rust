@@ -13,7 +13,7 @@ mod framebuffer;
 use crate::framebuffer::compose::{picture_frame, solid_color_frame};
 
 mod config;
-use crate::config::config::load_config;
+use crate::config::{load_config, Picture};
 
 mod protocol;
 use crate::protocol::probe::probe;
@@ -33,19 +33,14 @@ fn main() -> Result<()> {
     let config = load_config(&args.config)?;
 
     let mut context = Context::new()?;
-    let (mut device, device_desc, mut handle) = match open_device(&mut context, config.device.vid, config.device.pid) {
-        Some(v) => v,
-        None => panic!("Failed to find the device: {}:{}", config.device.vid, config.device.pid),
-    };
+    let (mut device, device_desc, mut handle) =
+        open_device(&mut context, config.device.vid, config.device.pid)?;
 
     println!("# Device opened successfully. Desc info:");
     read_device_info(&device_desc, &mut handle)?;
 
     println!("# Looking for bulk endpoints.");
-    let bulk_eps = match find_bulk_endpoints(&mut device, &device_desc) {
-        Some(v) => v,
-        None => panic!("Failed to find BULK_IN/OUT endpoints!"),
-    };
+    let bulk_eps = find_bulk_endpoints(&mut device, &device_desc)?;
     println!("BULK_IN: {:?}", bulk_eps.in_ep);
     println!("BULK_OUT: {:?}", bulk_eps.out_ep);
 
@@ -60,15 +55,15 @@ fn main() -> Result<()> {
 
     println!("# Let's send some frames");
     let frame = match config.picture {
-        config::config::Picture::SolidColor { color } => {
+        Picture::SolidColor { color } => {
             solid_color_frame(config.resolution.width, config.resolution.height, color)
-        },
-        config::config::Picture::Image { file } => {
+        }
+        Picture::Image { file } => {
             picture_frame(config.resolution.width, config.resolution.height, &file)
-        },
-        config::config::Picture::Video { file, fps } => {
-            !todo!()
-        },
+        }
+        Picture::Video { file, fps } => {
+            todo!("Video support not yet implemented: {}, {}", file, fps)
+        }
     };
 
     let fps = 1;

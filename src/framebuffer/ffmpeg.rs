@@ -1,16 +1,18 @@
+use std::env;
 use std::fs;
-use anyhow::{Result, Context};
 use std::process::Command;
+
+use anyhow::{Context, Result};
 
 pub fn ffmpeg_convert_image_to_rg565ble(
     filepath: &str,
     width: usize,
-    height: usize
+    height: usize,
 ) -> Result<Vec<u8>> {
-    let w = width.to_string();
-    let h = height.to_string();
-    let scale = format!("scale={}:{}:flags=lanczos", w, h);
-    let output = "img.rgb565";
+    let output = env::temp_dir().join("trcc_frame.rgb565");
+    let output_str = output.to_string_lossy();
+
+    let scale = format!("scale={}:{}:flags=lanczos", width, height);
     let args = [
         "-i", filepath,
         "-vf", &scale,
@@ -18,7 +20,7 @@ pub fn ffmpeg_convert_image_to_rg565ble(
         "-pix_fmt", "rgb565le",
         "-f", "rawvideo",
         "-y",
-        &output
+        &output_str,
     ];
 
     println!("ffmpeg {}", args.join(" "));
@@ -27,12 +29,14 @@ pub fn ffmpeg_convert_image_to_rg565ble(
         anyhow::bail!("ffmpeg failed");
     }
 
-    let pixels = fs::read(&output).with_context(|| format!("failed to read {:?}", &output))?;
+    let pixels = fs::read(&output).with_context(|| format!("failed to read {:?}", output))?;
+
+    // Clean up temp file
+    let _ = fs::remove_file(&output);
 
     if pixels.len() != width * height * 2 {
         anyhow::bail!(
-            "{} file has wrong size: {}, expected {}",
-            output,
+            "rgb565 file has wrong size: {}, expected {}",
             pixels.len(),
             width * height * 2
         );

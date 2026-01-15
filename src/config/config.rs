@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::fs;
-use std::path::Path;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {

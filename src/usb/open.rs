@@ -1,11 +1,10 @@
 use std::time::Duration;
-use anyhow::anyhow;
 
-use rusb::{
-    Device, DeviceDescriptor, DeviceHandle, Direction, Result, TransferType, UsbContext,
-};
+use anyhow::{bail, Context, Result};
+use rusb::{Device, DeviceDescriptor, DeviceHandle, Direction, TransferType, UsbContext};
 
 #[derive(Debug)]
+#[allow(dead_code)] // only address is used for now
 pub struct Endpoint {
     address: u8,
     config: u8,
@@ -29,11 +28,10 @@ pub fn open_device<T: UsbContext>(
     context: &mut T,
     vid: u16,
     pid: u16,
-) -> Option<(Device<T>, DeviceDescriptor, DeviceHandle<T>)> {
-    let devices = match context.devices() {
-        Ok(d) => d,
-        Err(_) => return None,
-    };
+) -> Result<(Device<T>, DeviceDescriptor, DeviceHandle<T>)> {
+    let devices = context
+        .devices()
+        .context("failed to enumerate USB devices")?;
 
     for device in devices.iter() {
         let device_desc = match device.device_descriptor() {
@@ -42,21 +40,21 @@ pub fn open_device<T: UsbContext>(
         };
 
         if device_desc.vendor_id() == vid && device_desc.product_id() == pid {
-            match device.open() {
-                Ok(handle) => return Some((device, device_desc, handle)),
-                Err(e) => panic!("Device found but failed to open: {}", e),
-            }
+            let handle = device
+                .open()
+                .with_context(|| format!("device {:04x}:{:04x} found but failed to open", vid, pid))?;
+            return Ok((device, device_desc, handle));
         }
     }
 
-    None
+    bail!("device {:04x}:{:04x} not found", vid, pid)
 }
 
 pub fn read_device_info<T: UsbContext>(
     device_desc: &DeviceDescriptor,
     handle: &mut DeviceHandle<T>,
 ) -> Result<()> {
-    handle.reset()?;
+    handle.reset().context("failed to reset USB device")?;
 
     let timeout = Duration::from_secs(1);
     let languages = handle.read_languages(timeout)?;
@@ -67,27 +65,20 @@ pub fn read_device_info<T: UsbContext>(
     if !languages.is_empty() {
         let language = languages[0];
 
-        println!(
-            "Manufacturer: {:?}",
-            handle
-                .read_manufacturer_string(language, device_desc, timeout)
-                .ok()
-                .unwrap()
-        );
-        println!(
-            "Product: {:?}",
-            handle
-                .read_product_string(language, device_desc, timeout)
-                .ok()
-                .unwrap()
-        );
-        println!(
-            "Serial Number: {:?}",
-            handle
-                .read_serial_number_string(language, device_desc, timeout)
-                .ok()
-                .unwrap()
-        );
+        let manufacturer = handle
+            .read_manufacturer_string(language, device_desc, timeout)
+            .unwrap_or_else(|_| "N/A".to_string());
+        println!("Manufacturer: {}", manufacturer);
+
+        let product = handle
+            .read_product_string(language, device_desc, timeout)
+            .unwrap_or_else(|_| "N/A".to_string());
+        println!("Product: {}", product);
+
+        let serial = handle
+            .read_serial_number_string(language, device_desc, timeout)
+            .unwrap_or_else(|_| "N/A".to_string());
+        println!("Serial Number: {}", serial);
     }
 
     Ok(())
@@ -96,7 +87,7 @@ pub fn read_device_info<T: UsbContext>(
 pub fn find_bulk_endpoints<T: UsbContext>(
     device: &mut Device<T>,
     device_desc: &DeviceDescriptor,
-) -> Option<BulkEndpoints> {
+) -> Result<BulkEndpoints> {
     for n in 0..device_desc.num_configurations() {
         let config_desc = match device.config_descriptor(n) {
             Ok(c) => c,
@@ -125,13 +116,12 @@ pub fn find_bulk_endpoints<T: UsbContext>(
                     }
                 }
 
-                // Check if both endpoints are filled
                 if let (Some(in_ep), Some(out_ep)) = (bulk_in, bulk_out) {
-                    return Some(BulkEndpoints { in_ep, out_ep });
+                    return Ok(BulkEndpoints { in_ep, out_ep });
                 }
             }
         }
     }
 
-    None
+    bail!("no bulk IN/OUT endpoint pair found")
 }

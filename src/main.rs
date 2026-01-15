@@ -10,7 +10,8 @@ use crate::usb::open::{open_device, read_device_info, find_bulk_endpoints};
 use crate::usb::bulk::send_bulk_out;
 
 mod framebuffer;
-use crate::framebuffer::compose::{picture_frame, solid_color_frame};
+use crate::framebuffer::compose::{picture_frame, solid_color_frame, video_frame};
+use crate::framebuffer::ffmpeg::VideoFrameReader;
 
 mod config;
 use crate::config::{load_config, Picture};
@@ -54,33 +55,91 @@ fn main() -> Result<()> {
     }
 
     println!("# Let's send some frames");
-    let frame = match config.picture {
+
+    match config.picture {
         Picture::SolidColor { color } => {
-            solid_color_frame(config.resolution.width, config.resolution.height, color)
+            let frame = solid_color_frame(config.resolution.width, config.resolution.height, color);
+            send_static_frame(&handle, &frame, bulk_eps.out_ep.get_address(), 1)?;
         }
         Picture::Image { file } => {
-            picture_frame(config.resolution.width, config.resolution.height, &file)
+            let frame = picture_frame(config.resolution.width, config.resolution.height, &file);
+            send_static_frame(&handle, &frame, bulk_eps.out_ep.get_address(), 1)?;
         }
         Picture::Video { file, fps } => {
-            todo!("Video support not yet implemented: {}, {}", file, fps)
+            stream_video(
+                &handle,
+                bulk_eps.out_ep.get_address(),
+                &file,
+                config.resolution.width,
+                config.resolution.height,
+                fps,
+            )?;
         }
     };
 
-    let fps = 1;
-    let period = Duration::from_millis(1000 / fps);
+    Ok(())
+}
 
+fn send_static_frame(
+    handle: &rusb::DeviceHandle<rusb::Context>,
+    frame: &[u8],
+    endpoint: u8,
+    fps: u64,
+) -> Result<()> {
+    let period = Duration::from_millis(1000 / fps);
     let mut counter = 0u64;
+
     loop {
         print!("\rFrames sent = {}", counter);
         io::stdout().flush().unwrap();
 
-        match send_bulk_out(&handle, &frame, bulk_eps.out_ep.get_address()) {
+        match send_bulk_out(handle, frame, endpoint) {
             Ok(_) => counter += 1,
             Err(e) => {
-                println!("Failed to send a frame: {}", e);
+                println!("\nFailed to send a frame: {}", e);
                 break;
             }
         }
+        std::thread::sleep(period);
+    }
+
+    Ok(())
+}
+
+fn stream_video(
+    handle: &rusb::DeviceHandle<rusb::Context>,
+    endpoint: u8,
+    file: &str,
+    width: u16,
+    height: u16,
+    fps: u32,
+) -> Result<()> {
+    let mut reader = VideoFrameReader::new(file, width as usize, height as usize, fps)?;
+    let period = Duration::from_millis(1000 / fps as u64);
+    let mut counter = 0u64;
+
+    loop {
+        let pixels = match reader.read_frame()? {
+            Some(p) => p,
+            None => {
+                println!("\nVideo stream ended");
+                break;
+            }
+        };
+
+        let frame = video_frame(width, height, pixels);
+
+        print!("\rFrames sent = {}", counter);
+        io::stdout().flush().unwrap();
+
+        match send_bulk_out(handle, &frame, endpoint) {
+            Ok(_) => counter += 1,
+            Err(e) => {
+                println!("\nFailed to send a frame: {}", e);
+                break;
+            }
+        }
+
         std::thread::sleep(period);
     }
 

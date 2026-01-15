@@ -40,3 +40,12 @@ pub fn picture_frame(
 
     compose_frame_pkt(width, height, bytes_per_pixel, pixels)
 }
+
+pub fn video_frame(
+    width: u16,
+    height: u16,
+    pixels: Vec<u8>,
+) -> Vec<u8> {
+    let bytes_per_pixel: u16 = 2;
+    compose_frame_pkt(width, height, bytes_per_pixel, pixels)
+}
